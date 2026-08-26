@@ -1,0 +1,43 @@
+# Environment / secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.pytest_cache/
+
+# Logs (including rotated)
+*.log
+*.log.*
+scanner.log*
+
+# Runtime data
+results/*.json
+jobs/
+uploads/
+
+# Dev artifacts
+test_*.pdf
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model cache
+.cache/
+transformers_cache/
+
+# Selenium
+.wdm/

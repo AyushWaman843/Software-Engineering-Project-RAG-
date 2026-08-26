@@ -1,0 +1,59 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                      FIX PRO SUBSCRIPTION - 2 STEPS                        ║
+║                     You already paid - just activate it!                   ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+Your payment went through successfully but couldn't save because a database 
+table is missing. Follow these 2 steps to activate Pro:
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: RUN SQL IN SUPABASE (2 minutes)                                   │
+└────────────────────────────────────────────────────────────────────────────┘
+
+1. Open this URL:
+   https://supabase.com/dashboard/project/tumjtwpvurfaheghmssk/sql/new
+
+2. Open the file: MIGRATION_INSTRUCTIONS.txt
+
+3. Copy the SQL (everything between the === lines)
+
+4. Paste into Supabase SQL Editor
+
+5. Click green "RUN" button (bottom right)
+
+6. Should see: "Success. No rows returned"
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: ACTIVATE YOUR PRO (10 seconds)                                    │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Double-click this file:
+   activate_pro.bat
+
+That's it! Your Pro subscription will be activated immediately.
+
+Then refresh http://localhost:3001 and you'll see:
+✓ "5 of 5 Pro scans available"
+✓ Plans modal shows "Active Pro subscription"
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ YOUR INFO                                                                  │
+└────────────────────────────────────────────────────────────────────────────┘
+
+User ID: a7bbe1e5-41a8-4888-84f5-df00f5ed23d3
+Payment: ✓ Received (₹999)
+Status: Waiting for database setup
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ NEED HELP?                                                                 │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Just tell me:
+- "Done with step 1" after running SQL
+- "Done with step 2" after running activate_pro.bat
+
+I'll verify everything is working!
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║  DO STEP 1 FIRST! activate_pro.bat will fail if you skip the SQL step.   ║
+╚════════════════════════════════════════════════════════════════════════════╝

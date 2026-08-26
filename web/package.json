@@ -1,0 +1,36 @@
+{
+  "name": "dpdp-compliance-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "host:demo": "node scripts/host-demo.mjs",
+    "build": "next build",
+    "start": "node scripts/start.mjs",
+    "start:next": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "audit:deps": "npm audit --audit-level=moderate"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.108.2",
+    "framer-motion": "^11.15.0",
+    "lucide-react": "0.469.0",
+    "next": "^15.1.11",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "^15.1.11",
+    "postcss": "^8.4.49",
+    "tailwindcss": "3.4.17",
+    "typescript": "^5.7.2"
+  }
+}

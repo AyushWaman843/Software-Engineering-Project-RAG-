@@ -1,0 +1,69 @@
+# Render Blueprint — DPDP scanner Flask API
+#
+# Setup:
+#   1. New → Blueprint → this repo
+#   2. Root Directory: dpdp_comp2/dpdp_comp
+#   3. Fill env vars marked sync:false in the dashboard (API keys, Supabase, etc.)
+#
+# Manual Web Service:
+#   Runtime: Docker | Dockerfile: ./Dockerfile | Health: /health
+#   RAM: ≥1 GB recommended (Chromium)
+#
+# Free tier: remove the `disk:` block below (disks need a paid plan).
+# Reports then live on ephemeral disk and are lost on redeploy.
+
+services:
+  - type: web
+    name: dpdp-scanner-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: DATA_DIR
+        value: /data
+      - key: GUNICORN_WORKERS
+        value: "1"
+      - key: GUNICORN_THREADS
+        value: "4"
+      - key: GUNICORN_TIMEOUT
+        value: "600"
+      - key: GUNICORN_MAX_REQUESTS
+        value: "0"
+      - key: CHROME_BIN
+        value: /usr/bin/chromium
+      - key: CHROMEDRIVER_PATH
+        value: /usr/bin/chromedriver
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: TURNSTILE_SECRET_KEY
+        sync: false
+      - key: PREMIUM_ENABLED
+        value: "1"
+      - key: FREE_SCANS_PER_USER
+        value: "1"
+    disk:
+      name: dpdp-api-data
+      mountPath: /data
+      sizeGB: 2
