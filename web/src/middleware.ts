@@ -35,25 +35,10 @@ function isApiPath(pathname: string): boolean {
   return pathname.startsWith("/api") || pathname.startsWith("/scanner/api");
 }
 
-/** TrustStack/server rewrites may hit Next on localhost without browser Basic auth.
- * Never trust Host alone (spoofable). Prefer a shared secret header; otherwise only
- * skip when clearly local AND not arriving via an edge/tunnel forwarded IP.
- */
+/** TrustStack server calls require a shared secret before skipping Basic auth. */
 function isInternalProxyRequest(request: NextRequest): boolean {
   const proxySecret = process.env.INTERNAL_PROXY_SECRET?.trim();
-  if (proxySecret) {
-    return request.headers.get("x-anix-internal-proxy") === proxySecret;
-  }
-
-  const fromEdge = Boolean(
-    request.headers.get("cf-connecting-ip") ||
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip"),
-  );
-  if (fromEdge) return false;
-
-  const host = (request.headers.get("host") || "").toLowerCase();
-  return host.startsWith("127.0.0.1") || host.startsWith("localhost");
+  return Boolean(proxySecret && request.headers.get("x-anix-internal-proxy") === proxySecret);
 }
 
 export async function middleware(request: NextRequest) {
@@ -96,6 +81,11 @@ export async function middleware(request: NextRequest) {
   }
 
   const requestHeaders = new Headers(request.headers);
+  // Only the configured upstream proxy may forward an entitlement assertion.
+  if (!process.env.INTERNAL_PROXY_SECRET?.trim() || !isInternalProxyRequest(request)) {
+    requestHeaders.delete("X-TrustStack-Proxy");
+    requestHeaders.delete("X-Anix-Internal-Proxy");
+  }
   if (isApiPath(pathname) && API_KEY) {
     requestHeaders.set("X-API-Key", API_KEY);
   }

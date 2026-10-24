@@ -59,14 +59,3 @@ def extract_text_from_pdf(source: Union[bytes, BinaryIO, Path, str]) -> str:
         raise ValueError("Extracted PDF text is too short for meaningful analysis.")
 
     return combined
-
-
-def save_pdf_upload(upload_dir: Path, filename: str, data: bytes) -> Path:
-    """Persist an uploaded PDF under upload_dir and return its path."""
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = re.sub(r"[^\w.\-]", "_", filename) or "document.pdf"
-    if not safe_name.lower().endswith(".pdf"):
-        safe_name += ".pdf"
-    dest = upload_dir / safe_name
-    dest.write_bytes(data)
-    return dest

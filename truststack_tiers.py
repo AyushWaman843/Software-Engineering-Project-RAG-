@@ -15,15 +15,13 @@ The truststack_subscriptions table stores subscription status.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+from config import PILOT_SCANS_PER_DAY
 from supabase_entitlements import _get_client, supabase_configured
 
 logger = logging.getLogger(__name__)
-
-PILOT_SCANS_PER_DAY = 1
-
 
 def get_truststack_subscription(user_id: str) -> Optional[Dict[str, Any]]:
     """Fetch the active TrustStack subscription for a user."""
@@ -120,7 +118,7 @@ def get_pilot_scans_today(user_id: str) -> int:
     if not client or not user_id:
         return 0
     
-    today = date.today().isoformat()
+    today = datetime.now(timezone.utc).date().isoformat()
     
     try:
         result = (
@@ -149,72 +147,17 @@ def get_pilot_scans_remaining(user_id: str) -> int:
 
 
 def consume_pilot_scan(user_id: str) -> bool:
-    """
-    Consume one daily Pilot scan slot.
-    Returns True if successful, False if daily limit reached or not Pilot.
-    """
-    if not user_has_pilot(user_id):
-        return False
-    
-    if get_pilot_scans_remaining(user_id) <= 0:
-        return False
-    
-    client = _get_client()
-    if not client:
-        return False
-    
-    today = date.today().isoformat()
-    used = get_pilot_scans_today(user_id)
-    
-    try:
-        client.table("daily_scan_usage").upsert(
-            {
-                "user_id": user_id,
-                "scan_date": today,
-                "scans_used": used + 1,
-            },
-            on_conflict="user_id,scan_date",
-        ).execute()
-        logger.info("Consumed Pilot scan for user %s (day %s, %d/%d used)", 
-                   user_id, today, used + 1, PILOT_SCANS_PER_DAY)
-        return True
-    except Exception as exc:
-        logger.warning("consume_pilot_scan failed: %s", exc)
-        return False
+    """Reserve one Pilot slot atomically."""
+    from supabase_entitlements import reserve_scan_slot_atomic
+
+    return reserve_scan_slot_atomic(user_id, "pilot_daily")
 
 
 def restore_pilot_scan(user_id: str) -> bool:
-    """
-    Restore a consumed Pilot scan (e.g., after failed scan).
-    Only restores for today's date.
-    """
-    if not user_id:
-        return False
-    
-    client = _get_client()
-    if not client:
-        return False
-    
-    today = date.today().isoformat()
-    used = get_pilot_scans_today(user_id)
-    
-    if used <= 0:
-        return True  # Nothing to restore
-    
-    try:
-        client.table("daily_scan_usage").upsert(
-            {
-                "user_id": user_id,
-                "scan_date": today,
-                "scans_used": max(0, used - 1),
-            },
-            on_conflict="user_id,scan_date",
-        ).execute()
-        logger.info("Restored Pilot scan for user %s (day %s)", user_id, today)
-        return True
-    except Exception as exc:
-        logger.warning("restore_pilot_scan failed: %s", exc)
-        return False
+    """Refund today's Pilot slot atomically."""
+    from supabase_entitlements import restore_scan_slot
+
+    return restore_scan_slot(user_id, "pilot_daily")
 
 
 def can_user_scan(user_id: str) -> Dict[str, Any]:

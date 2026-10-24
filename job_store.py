@@ -40,12 +40,12 @@ def _maybe_refund_failed_job(job: Dict[str, Any]) -> Dict[str, Any]:
         return job
     owner = (job.get("owner_user_id") or "").strip()
     slot = (job.get("scan_slot_type") or "").strip()
-    if not owner or slot not in ("free", "prepaid", "pro"):
+    if not owner or slot not in ("free", "prepaid", "pro", "pilot_daily"):
         return job
     try:
         from supabase_entitlements import restore_scan_slot
 
-        if restore_scan_slot(owner, slot):
+        if restore_scan_slot(owner, slot, str(job.get("created_at") or "")[:10] or None):
             job["credit_refunded"] = True
             logger.info(
                 "Refunded %s scan slot for user %s (job %s)",

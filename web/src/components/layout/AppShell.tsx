@@ -79,6 +79,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <MobileReportBar />
           </div>
           <CookieSettingsModal />
+          <CookieConsentBanner />
           <div className="hidden md:block">
             <LexBot />
           </div>

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import type { ConfidenceLabel } from "@/components/report/ConfidenceBadge";
 
 interface ConfidenceUpsellBannerProps {
   reportId: string;

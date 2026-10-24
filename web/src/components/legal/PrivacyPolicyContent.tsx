@@ -158,29 +158,31 @@ export function PrivacyPolicyContent() {
       </p>
       <ul>
         <li>
-          <strong>Account Data:</strong> Retained until you delete your account or after 2 years of
-          inactivity, whichever is earlier.
+          <strong>Account Data:</strong> Retained while your account is active. You may request account
+          deletion using the contact details below.
         </li>
         <li>
-          <strong>Scan Data and Uploaded Documents:</strong> Retained for 30 days after scan completion to
-          allow report regeneration; thereafter securely erased.
+          <strong>Scan Reports:</strong> Retained while your account is active so you can reopen purchased
+          reports. Reports may include extracted policy text. You may request deletion of your account
+          and its scanner data using the contact details below.
         </li>
         <li>
-          <strong>Payment Data (transaction records):</strong> Retained for 5 years as required by financial
-          regulations.
+          <strong>Uploaded PDFs and Temporary Job Data:</strong> New PDF uploads are processed without
+          storing the original files. Temporary job details and older stored uploads are removed after
+          30 days.
         </li>
         <li>
-          <strong>Technical Logs:</strong> Retained for 1 year for security and debugging.
+          <strong>Payment Data:</strong> Transaction records are retained as required for accounting,
+          payment disputes, and applicable law.
+        </li>
+        <li>
+          <strong>Technical Logs:</strong> Rotated for security and debugging.
         </li>
         <li>
           <strong>Communication Data:</strong> Retained for the duration of the relevant issue and then
           securely erased.
         </li>
       </ul>
-      <p>
-        At least 48 hours before erasure of personal data due to inactivity, we will notify you by email,
-        giving you an opportunity to log in and prevent deletion.
-      </p>
 
       <h2>7. Transfer of personal data outside India</h2>
       <p>

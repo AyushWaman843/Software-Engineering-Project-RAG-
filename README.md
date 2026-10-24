@@ -11,6 +11,7 @@ python -m venv venv
 .\venv\Scripts\activate          # macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
 copy .env.example .env           # add DEEPSEEK_API_KEY, API_KEY, etc.
+copy web\.env.local.example web\.env.local
 
 cd web
 npm install
@@ -63,11 +64,18 @@ Copy `.env.example` to `.env` (backend) and `web/.env.local.example` to `web/.en
 | `DEEPSEEK_API_KEY` | `.env` | LLM analysis |
 | `API_KEY` | `.env` | Protects backend `/api/*` |
 | `INTERNAL_API_KEY` | `web/.env.local` | Same value as `API_KEY`; injected by Next.js proxy |
+| `INTERNAL_PROXY_SECRET` | both | Shared secret for trusted upstream TrustStack assertions; never expose in `NEXT_PUBLIC_*` |
 | `APP_PASSWORD` | both | HTTP Basic Auth on the UI (optional) |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | `.env` | Premium checkout (optional) |
 | `RAZORPAY_WEBHOOK_SECRET` | `.env` | Razorpay webhook signature verification |
 
 See **DEPLOY.md** for production (Docker, Gunicorn, security).
+
+Apply `supabase/schema.sql`, the relevant unified-auth migration, then
+`supabase/migrate_atomic_scan_slots.sql` before enabling scan quotas. The API
+fails closed when the atomic quota functions are missing. Set the same
+`INTERNAL_PROXY_SECRET` in the Flask and Next.js environments if TrustStack
+forwards already-reserved scans.
 
 ## Production
 
@@ -81,9 +89,17 @@ Or see DEPLOY.md for local production without Docker.
 
 ```bash
 pytest tests/
+cd web
+npm run lint
+npm run typecheck
+npm run build
 ```
 
 See **SMOKETEST.md** for the manual pre-launch checklist.
+
+GitHub Actions runs these checks on pushes and pull requests. See
+**ENGINEERING.md** for data retention, account deletion, quota behavior, and
+operational checks.
 
 ## Demo reset (clean slate)
 

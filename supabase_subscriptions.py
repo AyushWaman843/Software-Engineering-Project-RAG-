@@ -129,10 +129,6 @@ def get_pro_scans_remaining(user_id: str) -> int:
         return 0
     
     ent = get_user_entitlements(user_id)
-    if not ent.get("pro_scans_reset_at"):
-        ensure_pro_reset_date(user_id)
-        ent = get_user_entitlements(user_id)
-
     used = int(ent.get("pro_scans_used") or 0)
     reset_at = ent.get("pro_scans_reset_at")
     
@@ -142,8 +138,6 @@ def get_pro_scans_remaining(user_id: str) -> int:
         try:
             reset_dt = datetime.fromisoformat(reset_at.replace("Z", "+00:00"))
             if now >= reset_dt:
-                # Reset the counter
-                reset_pro_scan_counter(user_id)
                 return PRO_SCANS_PER_MONTH
         except Exception as exc:
             logger.warning("Failed to parse pro_scans_reset_at: %s", exc)
@@ -288,38 +282,10 @@ def reset_pro_scan_counter(user_id: str) -> bool:
 
 
 def consume_pro_scan(user_id: str) -> bool:
-    """
-    Consume one Pro scan slot.
-    Returns True if successful, False if quota exhausted or no active subscription.
-    """
-    if not user_has_active_pro(user_id):
-        return False
-    
-    remaining = get_pro_scans_remaining(user_id)
-    if remaining <= 0:
-        return False
-    
-    client = _get_client()
-    if not client:
-        return False
-    
-    ent = get_user_entitlements(user_id)
-    used = int(ent.get("pro_scans_used") or 0)
-    
-    try:
-        client.table("user_entitlements").upsert(
-            {
-                "user_id": user_id,
-                "pro_scans_used": used + 1,
-                "pro_scans_reset_at": ent.get("pro_scans_reset_at"),
-            },
-            on_conflict="user_id",
-        ).execute()
-        logger.info("Consumed Pro scan for user %s (%d/%d used)", user_id, used + 1, PRO_SCANS_PER_MONTH)
-        return True
-    except Exception as exc:
-        logger.warning("consume_pro_scan failed: %s", exc)
-        return False
+    """Reserve one legacy Pro slot with the same atomic path as other tiers."""
+    from supabase_entitlements import reserve_scan_slot_atomic
+
+    return reserve_scan_slot_atomic(user_id, "pro")
 
 
 def initialize_pro_subscription_scans(user_id: str) -> bool:

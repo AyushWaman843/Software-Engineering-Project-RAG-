@@ -12,15 +12,15 @@ import secrets
 import threading
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import urlparse
 
 import validators
 
-from config import MAX_CONCURRENT_SCANS, RESULTS_DIR, SCAN_JOB_TIMEOUT_SECONDS, UPLOADS_DIR
-from document_ingest import extract_text_from_pdf, save_pdf_upload
+from config import MAX_CONCURRENT_SCANS, RESULTS_DIR, SCAN_JOB_TIMEOUT_SECONDS
+from document_ingest import extract_text_from_pdf
 from compliance_checker import ComplianceReport, run_compliance_check
 from job_store import count_running_jobs, load_job, mark_stale_running_jobs, save_job
 from scraper import cleanup_driver, discover_policies, fetch_policy_text
@@ -97,15 +97,23 @@ def save_report(report: ComplianceReport, slug: Optional[str] = None) -> str:
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
 
+    mirrored = False
     try:
         from supabase_store import upsert_scan_report
 
-        if upsert_scan_report(report_id, payload):
+        mirrored = upsert_scan_report(report_id, payload)
+        if mirrored:
             logger.info("Report mirrored to Supabase: %s", report_id)
         else:
             logger.warning("Report disk-saved but Supabase mirror failed: %s", report_id)
     except Exception as exc:
         logger.warning("Supabase report mirror skipped for %s: %s", report_id, exc)
+
+    from config import is_production
+
+    if is_production() and not mirrored:
+        filepath.unlink(missing_ok=True)
+        raise RuntimeError("Could not save report to durable storage.")
 
     logger.info("Report saved to %s", filepath)
     return str(filepath)
@@ -503,13 +511,9 @@ def run_pdf_scan_job(
     try:
         status("Reading uploaded PDF documents…", 10)
 
-        upload_dir = UPLOADS_DIR / job_id
-        upload_dir.mkdir(parents=True, exist_ok=True)
-
         policy_text = None
         terms_text = ""
         cookie_text = ""
-        saved_files: Dict[str, str] = {}
         display_links: Dict[str, Optional[str]] = {
             "privacy": None,
             "terms": None,
@@ -534,10 +538,8 @@ def run_pdf_scan_job(
         for doc_type, data in pdf_files.items():
             label = doc_labels.get(doc_type, doc_type.title())
             status(f"Extracting text from {label} PDF…", 30)
-            path = save_pdf_upload(upload_dir, f"{doc_type}.pdf", data)
-            saved_files[doc_type] = str(path)
             text = extract_text_from_pdf(data)
-            display_links[doc_type] = f"Uploaded: {path.name}"
+            display_links[doc_type] = f"Uploaded: {doc_type}.pdf"
 
             if doc_type == "privacy":
                 policy_text = text
@@ -573,7 +575,6 @@ def run_pdf_scan_job(
             status_callback=analysis_callback,
             terms_text=terms_text,
         )
-        report.analysis_details["uploaded_files"] = saved_files
         report.analysis_details["input_mode"] = "pdf"
         _persist_extracted_texts(report, policy_text, terms_text, cookie_text)
 
@@ -631,12 +632,11 @@ def start_scan(
     scan_slot_type: Optional[str] = None,
 ) -> str:
     """Start a background scan and return job_id."""
-    capacity_error = _check_scan_capacity()
-    if capacity_error:
-        raise RuntimeError(capacity_error)
-
     job_id = uuid.uuid4().hex
     with _jobs_lock:
+        capacity_error = _check_scan_capacity()
+        if capacity_error:
+            raise RuntimeError(capacity_error)
         _jobs[job_id] = {
             "id": job_id,
             "url": url,
@@ -644,7 +644,7 @@ def start_scan(
             "progress": 0,
             "message": "Queued",
             "log": [],
-            "created_at": datetime.now().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "owner_user_id": (owner_user_id or "").strip() or None,
             "auto_unlock_on_complete": auto_unlock_on_complete,
             "scan_slot_type": (scan_slot_type or "").strip() or None,
@@ -669,12 +669,11 @@ def start_pdf_scan(
     scan_slot_type: Optional[str] = None,
 ) -> str:
     """Start a background scan from uploaded PDFs and return job_id."""
-    capacity_error = _check_scan_capacity()
-    if capacity_error:
-        raise RuntimeError(capacity_error)
-
     job_id = uuid.uuid4().hex
     with _jobs_lock:
+        capacity_error = _check_scan_capacity()
+        if capacity_error:
+            raise RuntimeError(capacity_error)
         _jobs[job_id] = {
             "id": job_id,
             "url": reference,
@@ -682,7 +681,7 @@ def start_pdf_scan(
             "progress": 0,
             "message": "Queued",
             "log": [],
-            "created_at": datetime.now().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "input_mode": "pdf",
             "owner_user_id": (owner_user_id or "").strip() or None,
             "auto_unlock_on_complete": auto_unlock_on_complete,

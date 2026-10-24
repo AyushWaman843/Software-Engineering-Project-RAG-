@@ -50,6 +50,7 @@ LOG_BACKUP_COUNT = int(os.environ.get("LOG_BACKUP_COUNT", "5"))
 PORT = int(os.environ.get("PORT", "5000"))
 FLASK_DEBUG = os.environ.get("FLASK_DEBUG", "0") == "1"
 API_KEY = os.environ.get("API_KEY", "").strip()
+INTERNAL_PROXY_SECRET = os.environ.get("INTERNAL_PROXY_SECRET", "").strip()
 
 # Supabase
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()

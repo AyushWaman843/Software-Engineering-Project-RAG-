@@ -43,6 +43,8 @@ services:
         generateValue: true
       - key: API_KEY
         sync: false
+      - key: INTERNAL_PROXY_SECRET
+        sync: false
       - key: DEEPSEEK_API_KEY
         sync: false
       - key: SUPABASE_URL

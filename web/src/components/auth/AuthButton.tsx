@@ -4,10 +4,6 @@ import { useEffect, useState } from "react";
 import { Loader2, LogOut, LogIn, UserPlus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
-interface AuthButtonProps {
-  isPremium?: boolean;
-}
-
 /** Placeholder matches nav button footprint so layout does not shift after hydration. */
 function AuthButtonPlaceholder() {
   return (
@@ -18,7 +14,7 @@ function AuthButtonPlaceholder() {
   );
 }
 
-export function AuthButton({ isPremium = false }: AuthButtonProps) {
+export function AuthButton() {
   const { user, loading, configured, signOut, openAuth } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [mounted, setMounted] = useState(false);

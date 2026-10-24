@@ -61,7 +61,7 @@ export function SiteHeader() {
           </a>
           <GetPilotButton isPremium={isPremium} />
           <ThemeToggle />
-          <AuthButton isPremium={isPremium} />
+          <AuthButton />
         </nav>
       </div>
     </header>

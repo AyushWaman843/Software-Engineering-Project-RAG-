@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(failRedirect);
   }
 
-  let response = NextResponse.redirect(successRedirect);
+  const response = NextResponse.redirect(successRedirect);
 
   const supabase = createServerClient(supabaseUrl, supabaseAnon, {
     cookies: {

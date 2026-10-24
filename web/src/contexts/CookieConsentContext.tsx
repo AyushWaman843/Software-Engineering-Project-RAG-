@@ -42,13 +42,6 @@ export function CookieConsentProvider({ children }: { children: ReactNode }) {
     if (stored.hasDecided) {
       setConsent(stored);
       applyConsentSideEffects(stored);
-    } else {
-      // Auto-accept silently — no banner shown. Essential + functional accepted,
-      // analytics off by default (privacy-friendly).
-      writeConsent(true, false);
-      const auto = { hasDecided: true, functional: true, analytics: false };
-      setConsent(auto);
-      applyConsentSideEffects(auto);
     }
     setReady(true);
   }, []);

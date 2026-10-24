@@ -13,10 +13,8 @@ def test_verify_webhook_signature_valid(monkeypatch):
     monkeypatch.setenv("RAZORPAY_KEY_ID", "rzp_test")
     monkeypatch.setenv("RAZORPAY_KEY_SECRET", "secret")
 
-    import importlib
     import razorpay_webhooks
-
-    importlib.reload(razorpay_webhooks)
+    monkeypatch.setattr(razorpay_webhooks, "RAZORPAY_WEBHOOK_SECRET", "whsec_test")
 
     body = b'{"event":"payment.captured"}'
     sig = hmac.new(b"whsec_test", body, hashlib.sha256).hexdigest()
@@ -28,9 +26,7 @@ def test_verify_webhook_signature_invalid(monkeypatch):
     monkeypatch.setenv("RAZORPAY_KEY_ID", "rzp_test")
     monkeypatch.setenv("RAZORPAY_KEY_SECRET", "secret")
 
-    import importlib
     import razorpay_webhooks
-
-    importlib.reload(razorpay_webhooks)
+    monkeypatch.setattr(razorpay_webhooks, "RAZORPAY_WEBHOOK_SECRET", "whsec_test")
 
     assert razorpay_webhooks.verify_webhook_signature(b"{}", "bad") is False

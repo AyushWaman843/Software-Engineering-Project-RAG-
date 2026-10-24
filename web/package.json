@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "node scripts/start.mjs",
     "start:next": "next start",
-    "lint": "next lint",
+    "lint": "next lint --no-cache",
     "typecheck": "tsc --noEmit",
     "audit:deps": "npm audit --audit-level=moderate"
   },

@@ -167,7 +167,7 @@ export function ScanForm() {
         },
       );
     },
-    [user?.id, finishScan],
+    [user?.id, session?.access_token, finishScan],
   );
 
   useEffect(() => {
@@ -278,7 +278,12 @@ export function ScanForm() {
         setSubmitting(false);
         return;
       }
-      const privacyFile = (form.elements.namedItem("privacy_pdf") as HTMLInputElement).files?.[0]!;
+      const privacyFile = (form.elements.namedItem("privacy_pdf") as HTMLInputElement).files?.[0];
+      if (!privacyFile) {
+        setError("Please upload a Privacy Policy PDF.");
+        setSubmitting(false);
+        return;
+      }
 
       lastScanLabel.current = refCheck.data;
 
@@ -645,7 +650,8 @@ export function ScanForm() {
             animate={{ opacity: 1, y: 0, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             className="mt-5 overflow-hidden rounded-2xl border border-mint/25 bg-[rgba(255,122,24,0.05)]"
-            role="status"
+            role="progressbar"
+            aria-label="Assessment progress"
             aria-live="polite"
             aria-valuenow={progress}
             aria-valuemin={0}

@@ -648,7 +648,7 @@ sequenceDiagram
   participant D as DeepSeek
 
   U->>N: Fill URL + confirm disclaimer
-  N->>F: POST /scanner/api/scan (X-User-Id)
+  N->>F: POST /scanner/api/scan (verified Supabase bearer token)
   F->>F: sign-in, rate limit, reserve_scan (free)
   F-->>N: { job_id }
   loop every 900ms

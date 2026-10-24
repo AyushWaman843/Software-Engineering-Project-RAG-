@@ -55,7 +55,7 @@ SCORING_WEIGHTS = {
     "data_retention_period": 5,        # Retention disclosure (Third Schedule)
     "dpdp_act_reference": 5,           # Explicit Act/Rules reference
     "privacy_policy_exists": 5,        # Baseline requirement
-    "cookie_banner": 5,                # Optional consent mechanism indicator
+    "cookie_banner": 0,                # Informational: a banner alone does not prove compliant consent
 }
 
 # =============================================================================

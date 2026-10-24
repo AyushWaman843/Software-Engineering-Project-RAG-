@@ -112,12 +112,14 @@ def assign_report_owner(report_id: str, user_id: str, report: Optional[dict] = N
     stored = load_report_by_id(report_id)
     if not stored:
         return
-    if stored.get("owner_user_id") == user_id:
-        return
-
     filepath = stored.pop("_filepath", None)
     stored.pop("_report_id", None)
     stored["owner_user_id"] = user_id
+    from config import is_production
+    from supabase_store import upsert_scan_report
+
+    if not upsert_scan_report(report_id, stored) and is_production():
+        raise RuntimeError("Could not save report ownership to durable storage.")
     if filepath:
         with open(filepath, "w", encoding="utf-8") as handle:
             json.dump(stored, handle, indent=2)
@@ -149,10 +151,8 @@ def grant_premium_access(
     filepath = report.pop("_filepath", None)
     report.pop("_report_id", None)
     existing_user = str(report.get("premium_unlocked_user_id") or "").strip()
-    if report.get("premium_unlocked") and user_id and existing_user == user_id:
-        return
-    if report.get("premium_unlocked") and existing_user and not user_id:
-        return
+    if report.get("premium_unlocked") and existing_user and user_id and existing_user != user_id:
+        raise PermissionError("Report is already unlocked for another account.")
     report["premium_unlocked"] = True
     report["premium_unlocked_at"] = datetime.now(timezone.utc).isoformat()
     if user_id:
@@ -161,8 +161,15 @@ def grant_premium_access(
         report["premium_payment_id"] = payment_id
     if order_id:
         report["premium_order_id"] = order_id
-    if not filepath:
-        raise RuntimeError("Report filepath missing.")
-    with open(filepath, "w", encoding="utf-8") as handle:
-        json.dump(report, handle, indent=2)
+    from config import is_production
+    from supabase_store import upsert_scan_report
+
+    mirrored = upsert_scan_report(report_id, report)
+    if not mirrored and is_production():
+        raise RuntimeError("Could not save report unlock to durable storage.")
+    if filepath:
+        with open(filepath, "w", encoding="utf-8") as handle:
+            json.dump(report, handle, indent=2)
+    elif not mirrored:
+        raise RuntimeError("Report is unavailable for update.")
     logger.info("Premium unlocked for report %s", report_id)

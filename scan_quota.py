@@ -22,6 +22,7 @@ from supabase_entitlements import (
     effective_free_scans_used,
     get_user_entitlements,
     grant_prepaid_scan,
+    reserve_scan_slot_atomic,
     record_report_unlock,
     supabase_configured,
 )
@@ -115,25 +116,8 @@ def check_scan_allowed(user_id: Optional[str], visitor_id: Optional[str]) -> Tup
 
 
 def _consume_prepaid_only(user_id: str) -> bool:
-    """Decrement one pay-before-scan credit without touching free/Pilot quotas."""
-    from supabase_entitlements import get_user_entitlements, _get_client
-
-    client = _get_client()
-    if not client or not user_id:
-        return False
-    ent = get_user_entitlements(user_id)
-    prepaid = int(ent.get("scan_credits") or 0)
-    if prepaid <= 0:
-        return False
-    try:
-        client.table("user_entitlements").upsert(
-            {"user_id": user_id, "scan_credits": prepaid - 1},
-            on_conflict="user_id",
-        ).execute()
-        return True
-    except Exception as exc:
-        logger.warning("consume prepaid-only failed: %s", exc)
-        return False
+    """Decrement one pay-before-scan credit atomically."""
+    return reserve_scan_slot_atomic(user_id, "prepaid")
 
 
 def reserve_scan(user_id: Optional[str], visitor_id: Optional[str]) -> Tuple[bool, str, str, str]:
@@ -142,7 +126,7 @@ def reserve_scan(user_id: Optional[str], visitor_id: Optional[str]) -> Tuple[boo
     Returns (allowed, error_message, error_code, slot_type).
     slot_type: 'pilot_daily' | 'pro' | 'free' | 'prepaid'
     """
-    from truststack_tiers import can_user_scan, consume_pilot_scan
+    from truststack_tiers import can_user_scan
 
     allowed, message, code = check_scan_allowed(user_id, visitor_id)
     if not allowed:
@@ -156,7 +140,7 @@ def reserve_scan(user_id: Optional[str], visitor_id: Optional[str]) -> Tuple[boo
 
     # Pilot: 1 full scan / day (non-stackable)
     if scan_type == "pilot_daily":
-        if consume_pilot_scan(user_id):
+        if reserve_scan_slot_atomic(user_id, "pilot_daily"):
             return True, "", "", "pilot_daily"
         return False, "Could not reserve Pilot scan quota.", "SCAN_QUOTA_ERROR", ""
 

@@ -6,6 +6,9 @@ Run via `npm run dev` from the web/ folder (starts this + Next.js together).
 from __future__ import annotations
 
 import logging
+import hmac
+import threading
+import time
 import secrets
 from logging.handlers import RotatingFileHandler
 from io import BytesIO
@@ -16,7 +19,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from flask import Flask, abort, jsonify, request, send_file
+from flask import Flask, abort, g, jsonify, request, send_file
+from data_retention import purge_expired_runtime_data
 
 from api_handlers import (
     build_preview_context,
@@ -45,6 +49,7 @@ from config import (
     LOG_FILE,
     LOG_MAX_BYTES,
     PORT,
+    INTERNAL_PROXY_SECRET,
     PREMIUM_COOKIE_MAX_AGE,
     PREMIUM_CURRENCY,
     PREMIUM_ENABLED,
@@ -63,6 +68,7 @@ from payment_ledger import (
     try_claim_payment,
 )
 from supabase_entitlements import check_supabase_tables, report_id_for_payment
+from supabase_entitlements import restore_scan_slot
 from user_reconcile import reconcile_user_account
 from scan_quota import (
     claim_anonymous_scan_for_user,
@@ -111,6 +117,39 @@ _scan_rate_limiter = RateLimiter(
     max_requests=RATE_LIMIT_SCANS_PER_HOUR,
     window_seconds=3600,
 )
+_last_retention_check = 0.0
+_retention_lock = threading.Lock()
+
+
+@app.before_request
+def maintain_temporary_data():
+    """Sweep once per day on active production instances, without delaying requests."""
+    global _last_retention_check
+    if not is_production() or time.monotonic() - _last_retention_check < 86400:
+        return None
+    with _retention_lock:
+        if time.monotonic() - _last_retention_check >= 86400:
+            _last_retention_check = time.monotonic()
+            threading.Thread(target=purge_expired_runtime_data, daemon=True).start()
+
+
+@app.before_request
+def start_request_log():
+    g.request_id = secrets.token_hex(8)
+    g.started_at = time.monotonic()
+
+
+@app.after_request
+def log_request(response):
+    request_id = getattr(g, "request_id", "")
+    if request_id:
+        response.headers["X-Request-ID"] = request_id
+        logger.info(
+            "request_id=%s method=%s path=%s status=%s duration_ms=%d",
+            request_id, request.method, request.path, response.status_code,
+            round((time.monotonic() - g.started_at) * 1000),
+        )
+    return response
 
 
 def _visitor_id() -> str:
@@ -120,45 +159,24 @@ def _visitor_id() -> str:
     return secrets.token_urlsafe(16)
 
 
-def _extract_user_id_from_jwt(token: str) -> str:
-    """Decode JWT locally (no network call) to extract user id (sub claim)."""
-    try:
-        import base64
-        import json as _json
-        parts = token.split(".")
-        if len(parts) != 3:
-            return ""
-        payload_b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
-        payload = _json.loads(base64.urlsafe_b64decode(payload_b64))
-        return str(payload.get("sub") or "").strip()
-    except Exception:
-        return ""
-
-
 def _truststack_proxy() -> bool:
-    """True when TrustStack is driving the scan engine (quota handled upstream)."""
-    return (request.headers.get("X-TrustStack-Proxy") or "").strip() == "1"
+    """Trust upstream quota only when the internal caller proves its identity."""
+    supplied = (request.headers.get("X-Anix-Internal-Proxy") or "").strip()
+    return bool(
+        INTERNAL_PROXY_SECRET
+        and supplied
+        and hmac.compare_digest(supplied, INTERNAL_PROXY_SECRET)
+        and (request.headers.get("X-TrustStack-Proxy") or "").strip() == "1"
+    )
 
 
 def _user_id() -> str:
-    """Verified Supabase user id. For TrustStack proxy calls decode JWT locally
-    (avoids Supabase round-trip failures). For direct calls verify against Supabase Auth."""
-    if _truststack_proxy():
-        from auth_user import extract_bearer_token
-        token = extract_bearer_token(request)
-        if token:
-            uid = _extract_user_id_from_jwt(token)
-            if uid:
-                return uid
-        return resolve_authenticated_user_id(request)
+    """Resolve only a Supabase-verified user, including internal proxy calls."""
     return resolve_authenticated_user_id(request)
 
 
 def _require_signed_in():
     """Assessments and reports require an authenticated account."""
-    # TrustStack proxy: API key already validated by before_request — trust the caller.
-    if _truststack_proxy():
-        return None
     if not _user_id():
         return (
             jsonify({"error": "Sign in to run an assessment.", "code": "SIGN_IN_REQUIRED"}),
@@ -170,19 +188,37 @@ def _require_signed_in():
 def _scan_quota_gate():
     """
     Reserve one scan slot before starting a job.
-    Returns (error_response_or_none, slot_type) where slot_type is 'free' or 'prepaid'.
+    Returns (error_response_or_none, slot_type).
     """
     # TrustStack already reserved/consumed its own entitlement — do not double-charge
     # the shared user_entitlements row. Force full unlock so PDF/report match a paid scan.
     if _truststack_proxy():
-        return None, "prepaid"
+        return None, "truststack"
     if not PREMIUM_ENABLED or PREMIUM_FREE_ACCESS:
-        return None, "free"
+        return None, "unmetered"
     allowed, message, code, slot_type = reserve_scan(_user_id() or None, _visitor_id())
     if allowed:
         return None, slot_type
-    status = 401 if code == "SIGN_IN_REQUIRED" else 403
+    status = 401 if code == "SIGN_IN_REQUIRED" else 503 if code == "SCAN_QUOTA_ERROR" else 403
     return jsonify({"error": message, "code": code}), status
+
+
+def _captcha_slot_type() -> str:
+    """Preview the slot so CAPTCHA runs before any quota is consumed."""
+    if _truststack_proxy():
+        return "truststack"
+    if not PREMIUM_ENABLED or PREMIUM_FREE_ACCESS:
+        return "free"
+    from truststack_tiers import can_user_scan
+
+    slot = can_user_scan(_user_id()).get("scan_type")
+    return "free" if slot == "free_preview" else (slot or "free")
+
+
+def _refund_scan_start(slot_type: str) -> None:
+    if PREMIUM_ENABLED and not PREMIUM_FREE_ACCESS and slot_type in ("free", "prepaid", "pro", "pilot_daily"):
+        if not restore_scan_slot(_user_id(), slot_type):
+            logger.error("Could not refund %s slot after scan start failed", slot_type)
 
 
 def _attach_visitor_cookie(response):
@@ -674,7 +710,7 @@ def _require_scan_captcha(scan_slot_type: str):
     Require Cloudflare Turnstile on free-tier scans when configured / enforced.
     Paid/pro slots skip CAPTCHA so paying customers aren't blocked twice.
     """
-    if scan_slot_type in ("prepaid", "pro", "pilot_daily"):
+    if scan_slot_type in ("prepaid", "pro", "pilot_daily", "truststack"):
         return None
     if not turnstile_configured():
         if captcha_enforced():
@@ -709,19 +745,8 @@ def api_start_scan():
     if rate_limited:
         return rate_limited
 
-    quota_blocked = _scan_quota_gate()
-    if quota_blocked[0]:
-        return quota_blocked[0]
-    scan_slot_type = quota_blocked[1]
-    # Full reports: Pilot daily, prepaid ₹299, and legacy Pro
-    auto_unlock = scan_slot_type in ("prepaid", "pro", "pilot_daily")
-
-    captcha_blocked = _require_scan_captcha(scan_slot_type)
-    if captcha_blocked:
-        return captcha_blocked
-
     if request.content_type and "multipart/form-data" in request.content_type:
-        return _start_pdf_scan(scan_slot_type=scan_slot_type, auto_unlock=auto_unlock)
+        return _start_pdf_scan()
 
     data = request.get_json(silent=True) or request.form
     try:
@@ -761,6 +786,13 @@ def api_start_scan():
             return jsonify({"error": f"{label}: {exc}"}), 400
         manual[field.replace("_url", "")] = normalized
 
+    captcha_blocked = _require_scan_captcha(_captcha_slot_type())
+    if captcha_blocked:
+        return captcha_blocked
+    quota_blocked, scan_slot_type = _scan_quota_gate()
+    if quota_blocked:
+        return quota_blocked
+
     try:
         job_id = start_scan(
             url=url,
@@ -768,15 +800,16 @@ def api_start_scan():
             terms_url_manual=manual.get("terms"),
             cookie_url_manual=manual.get("cookie"),
             owner_user_id=_user_id() or None,
-            auto_unlock_on_complete=auto_unlock,
+            auto_unlock_on_complete=scan_slot_type in ("prepaid", "pro", "pilot_daily", "truststack"),
             scan_slot_type=scan_slot_type,
         )
     except RuntimeError as exc:
+        _refund_scan_start(scan_slot_type)
         return jsonify({"error": str(exc)}), 503
     return jsonify({"job_id": job_id})
 
 
-def _start_pdf_scan(scan_slot_type: str = "", auto_unlock: bool = False):
+def _start_pdf_scan():
     try:
         reference = validate_pdf_reference(request.form.get("reference"))
     except ValidationError as exc:
@@ -802,15 +835,23 @@ def _start_pdf_scan(scan_slot_type: str = "", auto_unlock: bool = False):
     if "privacy" not in pdf_files:
         return jsonify({"error": "Please upload a Privacy Policy PDF."}), 400
 
+    captcha_blocked = _require_scan_captcha(_captcha_slot_type())
+    if captcha_blocked:
+        return captcha_blocked
+    quota_blocked, scan_slot_type = _scan_quota_gate()
+    if quota_blocked:
+        return quota_blocked
+
     try:
         job_id = start_pdf_scan(
             reference=reference,
             pdf_files=pdf_files,
             owner_user_id=_user_id() or None,
-            auto_unlock_on_complete=auto_unlock,
+            auto_unlock_on_complete=scan_slot_type in ("prepaid", "pro", "pilot_daily", "truststack"),
             scan_slot_type=scan_slot_type or None,
         )
     except RuntimeError as exc:
+        _refund_scan_start(scan_slot_type)
         return jsonify({"error": str(exc)}), 503
     return jsonify({"job_id": job_id})
 

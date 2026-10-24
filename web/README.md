@@ -20,7 +20,7 @@ Single React app (Next.js 15) for the DPDP compliance scanner.
 From the **project root** or **`web/`** folder:
 
 ```powershell
-cd c:\Users\palla\Downloads\dpdp_comp\web
+cd web
 npm install
 npm run dev
 ```
@@ -41,7 +41,7 @@ The dev script starts:
 ## First-time Python setup
 
 ```powershell
-cd c:\Users\palla\Downloads\dpdp_comp
+cd ..
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt

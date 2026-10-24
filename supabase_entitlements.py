@@ -66,6 +66,28 @@ def get_user_entitlements(user_id: str) -> Dict[str, Any]:
     return _default_entitlements(user_id)
 
 
+def reserve_scan_slot_atomic(user_id: str, slot_type: str) -> bool:
+    """Reserve one slot with a conditional database write; fail closed on RPC errors."""
+    from config import FREE_SCANS_PER_USER, PILOT_SCANS_PER_DAY, PRO_SCANS_PER_MONTH
+
+    client = _get_client()
+    if not client or not user_id:
+        return False
+    limit = {
+        "pilot_daily": PILOT_SCANS_PER_DAY,
+        "pro": PRO_SCANS_PER_MONTH,
+    }.get(slot_type, FREE_SCANS_PER_USER)
+    try:
+        result = client.rpc(
+            "reserve_scan_slot",
+            {"p_user_id": user_id, "p_slot": slot_type, "p_limit": limit},
+        ).execute()
+        return result.data is True
+    except Exception as exc:
+        logger.error("reserve_scan_slot RPC failed; run migrate_atomic_scan_slots.sql: %s", exc)
+        return False
+
+
 def consume_user_scan(user_id: str) -> Optional[str]:
     """
     Consume one scan slot for a signed-in user.
@@ -86,63 +108,25 @@ def consume_user_scan(user_id: str) -> Optional[str]:
             logger.error("consume_user_scan refused: Supabase not configured in production")
             return None
         return "free"
-    client = _get_client()
-    if not client or not user_id:
+    if not user_id:
         return None
     
     # Check Pro subscription first
-    from supabase_subscriptions import (
-        consume_pro_scan,
-        get_pro_scans_remaining,
-        user_has_active_pro,
-    )
+    from supabase_subscriptions import user_has_active_pro
 
     if user_has_active_pro(user_id):
-        if get_pro_scans_remaining(user_id) > 0:
-            if consume_pro_scan(user_id):
-                return "pro"
-            return None
+        if reserve_scan_slot_atomic(user_id, "pro"):
+            return "pro"
     
     # Fall back to free/prepaid scans
-    ent = get_user_entitlements(user_id)
     free_used = effective_free_scans_used(user_id)
-    prepaid = int(ent.get("scan_credits") or 0)
-    pro_used = int(ent.get("pro_scans_used") or 0)
-    pro_reset = ent.get("pro_scans_reset_at")
 
     if free_used < FREE_SCANS_PER_USER:
-        try:
-            client.table("user_entitlements").upsert(
-                {
-                    "user_id": user_id,
-                    "free_scans_used": free_used + 1,
-                    "scan_credits": prepaid,
-                    "pro_scans_used": pro_used,
-                    "pro_scans_reset_at": pro_reset,
-                },
-                on_conflict="user_id",
-            ).execute()
+        if reserve_scan_slot_atomic(user_id, "free"):
             return "free"
-        except Exception as exc:
-            logger.warning("consume free scan failed: %s", exc)
-            return None
 
-    if prepaid > 0:
-        try:
-            client.table("user_entitlements").upsert(
-                {
-                    "user_id": user_id,
-                    "free_scans_used": free_used,
-                    "scan_credits": prepaid - 1,
-                    "pro_scans_used": pro_used,
-                    "pro_scans_reset_at": pro_reset,
-                },
-                on_conflict="user_id",
-            ).execute()
-            return "prepaid"
-        except Exception as exc:
-            logger.warning("consume prepaid scan failed: %s", exc)
-            return None
+    if reserve_scan_slot_atomic(user_id, "prepaid"):
+        return "prepaid"
 
     return None
 
@@ -152,70 +136,40 @@ def grant_prepaid_scan(user_id: str) -> bool:
     client = _get_client()
     if not client or not user_id:
         return False
-    ent = get_user_entitlements(user_id)
-    prepaid = int(ent.get("scan_credits") or 0)
     try:
-        # Only update scan_credits — never touch free_scans_used on this path.
-        client.table("user_entitlements").upsert(
-            {
-                "user_id": user_id,
-                "scan_credits": prepaid + 1,
-            },
-            on_conflict="user_id",
-        ).execute()
-        return True
+        return client.rpc("grant_prepaid_scan_credit", {"p_user_id": user_id}).execute().data is True
     except Exception as exc:
         logger.warning("grant_prepaid_scan failed: %s", exc)
         return False
 
 
-def restore_scan_slot(user_id: str, slot_type: str) -> bool:
+def restore_scan_slot(user_id: str, slot_type: str, scan_date: Optional[str] = None) -> bool:
     """
     Refund a consumed scan slot after a failed/interrupted job.
     slot_type: 'free' | 'prepaid' | 'pro' | 'pilot_daily'
     """
     if not user_id or slot_type not in ("free", "prepaid", "pro", "pilot_daily"):
         return False
-    if slot_type == "prepaid":
-        return grant_prepaid_scan(user_id)
-    if slot_type == "pilot_daily":
-        from truststack_tiers import restore_pilot_scan
-        return restore_pilot_scan(user_id)
-
     client = _get_client()
     if not client:
         return False
-    ent = get_user_entitlements(user_id)
-    try:
-        if slot_type == "free":
-            used = max(0, int(ent.get("free_scans_used") or 0) - 1)
-            client.table("user_entitlements").upsert(
+    if slot_type in ("free", "prepaid", "pro", "pilot_daily"):
+        from datetime import datetime, timezone
+
+        try:
+            result = client.rpc(
+                "refund_scan_slot",
                 {
-                    "user_id": user_id,
-                    "free_scans_used": used,
-                    "scan_credits": int(ent.get("scan_credits") or 0),
-                    "pro_scans_used": int(ent.get("pro_scans_used") or 0),
-                    "pro_scans_reset_at": ent.get("pro_scans_reset_at"),
+                    "p_user_id": user_id,
+                    "p_slot": slot_type,
+                    "p_scan_date": scan_date or datetime.now(timezone.utc).date().isoformat(),
                 },
-                on_conflict="user_id",
             ).execute()
-            return True
-        # pro
-        used = max(0, int(ent.get("pro_scans_used") or 0) - 1)
-        client.table("user_entitlements").upsert(
-            {
-                "user_id": user_id,
-                "free_scans_used": int(ent.get("free_scans_used") or 0),
-                "scan_credits": int(ent.get("scan_credits") or 0),
-                "pro_scans_used": used,
-                "pro_scans_reset_at": ent.get("pro_scans_reset_at"),
-            },
-            on_conflict="user_id",
-        ).execute()
-        return True
-    except Exception as exc:
-        logger.warning("restore_scan_slot(%s) failed: %s", slot_type, exc)
-        return False
+            return result.data is True
+        except Exception as exc:
+            logger.error("refund_scan_slot RPC failed: %s", exc)
+            return False
+    return False
 
 
 def get_visitor_scan_count(visitor_id: str) -> int:
