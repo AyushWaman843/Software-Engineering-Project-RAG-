@@ -51,13 +51,26 @@ NAVIGATION_PHRASES = [
     "Submit",
 ]
 
+# Longer lines are real content even if they mention a navigation word.
+NAV_LINE_MAX_CHARS = 80
+
+
+def _looks_like_prose(text: str) -> bool:
+    """Running sentences, as opposed to menu text which has almost no sentence endings."""
+    sentences = len(re.findall(r"[.!?](?:\s|$)", text))
+    return sentences >= max(3, len(text) // 400)
+
 
 def clean_extracted_text(raw_text: str) -> str:
     """
     Trim homepage/nav junk from scraped policy text.
 
-    1. Start at the earliest POLICY_START_MARKERS hit (case-insensitive).
-    2. Drop lines containing NAVIGATION_PHRASES.
+    1. Start at the earliest POLICY_START_MARKERS hit (case-insensitive), unless the
+       text before it is running prose - that is policy content, not page chrome
+       (a "last updated on" footer must not erase the policy above it).
+    2. Drop short lines containing NAVIGATION_PHRASES and strip the multi-word
+       phrases from what remains. A single word such as "Submit" is only ever
+       dropped as a whole short line, never from inside a sentence.
     3. Remove HTML comments and collapse excessive blank lines / whitespace.
     """
     if not raw_text:
@@ -72,9 +85,8 @@ def clean_extracted_text(raw_text: str) -> str:
         if idx != -1:
             start_at = idx if start_at is None else min(start_at, idx)
 
-    if start_at is not None:
+    if start_at is not None and not _looks_like_prose(text[:start_at]):
         text = text[start_at:]
-        text_lower = text.lower()
 
     lines = text.splitlines() if "\n" in text else [text]
     kept_lines: list[str] = []
@@ -82,7 +94,9 @@ def clean_extracted_text(raw_text: str) -> str:
         stripped = line.strip()
         if not stripped:
             continue
-        if any(phrase.lower() in stripped.lower() for phrase in NAVIGATION_PHRASES):
+        if len(stripped) <= NAV_LINE_MAX_CHARS and any(
+            phrase.lower() in stripped.lower() for phrase in NAVIGATION_PHRASES
+        ):
             continue
         kept_lines.append(stripped)
 
@@ -92,7 +106,8 @@ def clean_extracted_text(raw_text: str) -> str:
         text = text.strip()
 
     for phrase in NAVIGATION_PHRASES:
-        text = re.sub(re.escape(phrase), "", text, flags=re.IGNORECASE)
+        if " " in phrase:
+            text = re.sub(rf"(?<!\w){re.escape(phrase)}(?!\w)", "", text, flags=re.IGNORECASE)
 
     text = re.sub(r"<!--[\s\S]*?-->", "", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
