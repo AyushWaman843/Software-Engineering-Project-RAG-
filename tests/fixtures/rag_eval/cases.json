@@ -1,0 +1,130 @@
+[
+  {
+    "id": "compliant_enterprise",
+    "description": "Detailed DPDP-aware notice; every indicator is addressed.",
+    "file": "compliant_enterprise.txt",
+    "gold": {
+      "notice_consent_purpose": {"status": "Found", "evidence": "You can withdraw your consent at any time through Settings > Privacy in the app or by writing to us."},
+      "data_principal_rights": {"status": "Found", "evidence": "the right to nominate another person to exercise these rights if you die or become incapacitated"},
+      "grievance_officer_contact": {"status": "Found", "evidence": "Our Grievance Officer is Ms. Kavita Nair"},
+      "parental_consent_children": {"status": "Found", "evidence": "unless we first obtain verifiable consent from the child's parent or lawful guardian"},
+      "consent_manager_mentioned": {"status": "Found", "evidence": "through a Consent Manager registered with the Data Protection Board of India"},
+      "cross_border_transfer": {"status": "Found", "evidence": "Transfers outside the territory of India are made only to countries and parties"},
+      "data_retention_period": {"status": "Found", "evidence": "erased three years after your last transaction"},
+      "dpdp_act_reference": {"status": "Found", "evidence": "under the Digital Personal Data Protection Act, 2023 and the Digital Personal Data Protection Rules, 2025"},
+      "privacy_policy_exists": {"status": "Found", "evidence": ""}
+    }
+  },
+  {
+    "id": "generic_startup",
+    "description": "Typical generic startup policy with no DPDP language.",
+    "file": "generic_startup.txt",
+    "gold": {
+      "notice_consent_purpose": {"status": "Partial", "evidence": "We collect personal information such as your name, email address, and phone number when you register"},
+      "data_principal_rights": {"status": "Missing", "evidence": ""},
+      "grievance_officer_contact": {"status": "Partial", "evidence": "You may contact us at support@startupindian.example if you have questions about this policy."},
+      "parental_consent_children": {"status": "Missing", "evidence": ""},
+      "consent_manager_mentioned": {"status": "Missing", "evidence": ""},
+      "cross_border_transfer": {"status": "Missing", "evidence": ""},
+      "data_retention_period": {"status": "Partial", "evidence": "We retain your personal data for as long as necessary to fulfil the purposes outlined in this policy"},
+      "dpdp_act_reference": {"status": "Missing", "evidence": ""},
+      "privacy_policy_exists": {"status": "Found", "evidence": ""}
+    }
+  },
+  {
+    "id": "grievance_in_footer",
+    "description": "Grievance officer details sit in a short Contact block at the very end.",
+    "file": "grievance_in_footer.txt",
+    "gold": {
+      "notice_consent_purpose": {"status": "Partial", "evidence": "We use this information to run your wallet, prevent fraud, provide customer support and send you service updates."},
+      "data_principal_rights": {"status": "Partial", "evidence": "You can update your profile information or ask us to delete your account at any time from the app settings."},
+      "grievance_officer_contact": {"status": "Found", "evidence": "Grievance Officer: Mr. Rohan Mehta"},
+      "parental_consent_children": {"status": "Missing", "evidence": ""},
+      "consent_manager_mentioned": {"status": "Missing", "evidence": ""},
+      "cross_border_transfer": {"status": "Missing", "evidence": ""},
+      "data_retention_period": {"status": "Found", "evidence": "We keep transaction records for seven years as required by financial regulations."},
+      "dpdp_act_reference": {"status": "Missing", "evidence": ""},
+      "privacy_policy_exists": {"status": "Found", "evidence": ""}
+    }
+  },
+  {
+    "id": "retention_table",
+    "description": "Retention periods given in a table (flattened to one line by the scraper).",
+    "file": "retention_table.txt",
+    "gold": {
+      "notice_consent_purpose": {"status": "Partial", "evidence": "We collect the name, email address, class and learning progress of each learner to provide lessons, track progress and communicate with parents."},
+      "data_principal_rights": {"status": "Missing", "evidence": ""},
+      "grievance_officer_contact": {"status": "Partial", "evidence": "Questions about this notice can be sent to privacy@nimbuslearning.example."},
+      "parental_consent_children": {"status": "Missing", "evidence": ""},
+      "consent_manager_mentioned": {"status": "Missing", "evidence": ""},
+      "cross_border_transfer": {"status": "Missing", "evidence": ""},
+      "data_retention_period": {"status": "Found", "evidence": "Account profile data | Life of the account plus three years"},
+      "dpdp_act_reference": {"status": "Missing", "evidence": ""},
+      "privacy_policy_exists": {"status": "Found", "evidence": ""}
+    }
+  },
+  {
+    "id": "cross_border_loose",
+    "description": "Overseas processing disclosed without the phrase 'outside India'.",
+    "file": "cross_border_loose.txt",
+    "gold": {
+      "notice_consent_purpose": {"status": "Partial", "evidence": "We use this information to make bookings on your behalf, send confirmations and provide customer support."},
+      "data_principal_rights": {"status": "Missing", "evidence": ""},
+      "grievance_officer_contact": {"status": "Missing", "evidence": ""},
+      "parental_consent_children": {"status": "Missing", "evidence": ""},
+      "consent_manager_mentioned": {"status": "Missing", "evidence": ""},
+      "cross_border_transfer": {"status": "Found", "evidence": "Our application servers are located in Singapore and the United States."},
+      "data_retention_period": {"status": "Missing", "evidence": ""},
+      "dpdp_act_reference": {"status": "Missing", "evidence": ""},
+      "privacy_policy_exists": {"status": "Found", "evidence": ""}
+    }
+  },
+  {
+    "id": "children_minors",
+    "description": "Children addressed as 'minors' / 'under 18' without verifiable parental consent.",
+    "file": "children_minors.txt",
+    "gold": {
+      "notice_consent_purpose": {"status": "Partial", "evidence": "We use them to run the game, prevent cheating and improve our products."},
+      "data_principal_rights": {"status": "Missing", "evidence": ""},
+      "grievance_officer_contact": {"status": "Partial", "evidence": "Write to support@pixelplay.example with any privacy questions."},
+      "parental_consent_children": {"status": "Partial", "evidence": "Our services are not intended for persons under 18 years of age and we do not knowingly collect their personal data."},
+      "consent_manager_mentioned": {"status": "Missing", "evidence": ""},
+      "cross_border_transfer": {"status": "Missing", "evidence": ""},
+      "data_retention_period": {"status": "Missing", "evidence": ""},
+      "dpdp_act_reference": {"status": "Missing", "evidence": ""},
+      "privacy_policy_exists": {"status": "Found", "evidence": ""}
+    }
+  },
+  {
+    "id": "dpo_wording",
+    "description": "Rights and grievance contact expressed in plain words (no 'right to', no 'grievance').",
+    "file": "dpo_wording.txt",
+    "gold": {
+      "notice_consent_purpose": {"status": "Found", "evidence": "We use your personal data to verify your identity, assess loan applications, collect repayments and meet our legal duties."},
+      "data_principal_rights": {"status": "Found", "evidence": "You can ask us at any time to show you the personal data we hold about you, to fix anything that is wrong or out of date, or to delete your data."},
+      "grievance_officer_contact": {"status": "Found", "evidence": "Our Data Protection Officer, Mr. Imran Qureshi, is the person who answers questions about how we process your personal data."},
+      "parental_consent_children": {"status": "Missing", "evidence": ""},
+      "consent_manager_mentioned": {"status": "Missing", "evidence": ""},
+      "cross_border_transfer": {"status": "Missing", "evidence": ""},
+      "data_retention_period": {"status": "Found", "evidence": "Loan records are kept for eight years after closure of the account, as required by law."},
+      "dpdp_act_reference": {"status": "Missing", "evidence": ""},
+      "privacy_policy_exists": {"status": "Found", "evidence": ""}
+    }
+  },
+  {
+    "id": "it_act_only",
+    "description": "Cites only the IT Act 2000 and SPDI Rules; no DPDP reference.",
+    "file": "it_act_only.txt",
+    "gold": {
+      "notice_consent_purpose": {"status": "Partial", "evidence": "We use this information to display your profile to other members, suggest matches and send you notifications."},
+      "data_principal_rights": {"status": "Missing", "evidence": ""},
+      "grievance_officer_contact": {"status": "Missing", "evidence": ""},
+      "parental_consent_children": {"status": "Missing", "evidence": ""},
+      "consent_manager_mentioned": {"status": "Missing", "evidence": ""},
+      "cross_border_transfer": {"status": "Missing", "evidence": ""},
+      "data_retention_period": {"status": "Missing", "evidence": ""},
+      "dpdp_act_reference": {"status": "Missing", "evidence": ""},
+      "privacy_policy_exists": {"status": "Found", "evidence": ""}
+    }
+  }
+]

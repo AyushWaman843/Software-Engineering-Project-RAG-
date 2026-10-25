@@ -41,6 +41,10 @@ _API_STRIP_ANALYSIS_KEYS = (
     "keyword_matches",
     "gemini_analysis",
     "llm_analysis",
+    # Operator diagnostics from the RAG pipeline; the web UI does not render them.
+    "retrieval",
+    "quality_flags",
+    "llm_usage",
 )
 
 _REPORT_UI_KEYS = (

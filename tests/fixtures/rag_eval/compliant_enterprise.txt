@@ -1,0 +1,29 @@
+Acme Retail Private Limited - Privacy Notice
+Last updated: 14 January 2026
+
+1. About this notice
+This Privacy Notice is published by Acme Retail Private Limited ("Acme", "we") as a Data Fiduciary under the Digital Personal Data Protection Act, 2023 and the Digital Personal Data Protection Rules, 2025. It explains how we handle the personal data of our customers ("Data Principals").
+
+2. The personal data we collect and why
+We collect the following personal data: your name, mobile number, email address, delivery address, order history and payment confirmation details. We use this data only for the specified purposes of creating your account, delivering your orders, providing customer support and sending service messages. We ask for your consent before we collect data for any other purpose, such as marketing.
+
+3. Consent and how to withdraw it
+Your consent is free, specific and informed. You can withdraw your consent at any time through Settings > Privacy in the app or by writing to us. Withdrawing consent is as easy as giving it.
+
+4. Your rights
+As a Data Principal you have the right to access a summary of your personal data, the right to correction and updating of inaccurate data, the right to erasure of data we no longer need, the right to grievance redressal, and the right to nominate another person to exercise these rights if you die or become incapacitated.
+
+5. Grievance Officer
+Our Grievance Officer is Ms. Kavita Nair, Acme Retail Private Limited, 14 MG Road, Bengaluru 560001. Email: grievance@acmeretail.example, telephone +91 80 4567 8900. We acknowledge every complaint within 48 hours and resolve it within 90 days. You may also complain to the Data Protection Board of India.
+
+6. Children
+We do not process the personal data of a child (anyone under 18) unless we first obtain verifiable consent from the child's parent or lawful guardian, and we do not track or target children with advertising.
+
+7. Consent Managers
+You may give, manage, review or withdraw your consent through a Consent Manager registered with the Data Protection Board of India.
+
+8. Transfers outside India
+We store personal data on servers in India. Some analytics providers process data in Singapore and Ireland. Transfers outside the territory of India are made only to countries and parties that meet the requirements notified by the Central Government.
+
+9. How long we keep personal data
+Account data is retained while your account is active and erased three years after your last transaction. Order and payment records are retained for eight years to meet tax law. Server logs are retained for one year. We tell you at least 48 hours before erasing your data.

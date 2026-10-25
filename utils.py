@@ -7,7 +7,7 @@ import re
 import random
 import logging
 import time
-from typing import Optional, List
+from typing import Iterable, Optional
 from urllib.parse import urlparse, urljoin
 from urllib.robotparser import RobotFileParser
 
@@ -320,6 +320,93 @@ def find_policy_links(soup: BeautifulSoup, base_url: str) -> dict[str, Optional[
             )
 
     return links
+
+
+# Pages that often hold DPDP evidence the privacy policy itself lacks, scored by topic.
+_RELATED_PATTERNS = [
+    (re.compile(p, re.IGNORECASE), score)
+    for p, score in (
+        (r"grievance", 100),
+        (r"data protection officer|data protection office|\bdpo\b", 100),
+        (r"redress", 95),
+        (r"nodal officer|compliance officer", 90),
+        (r"your rights|privacy rights|data principal|data subject|\bdsar\b|subject access", 85),
+        (r"\bcomplaint", 85),
+        (r"\bdpdp\b", 80),
+        (r"\bchild|\bminor|parental|\bteen", 75),
+        (r"\bconsent", 70),
+        (r"retention", 70),
+        (r"data protection|privacy cent(?:re|er)|trust cent(?:re|er)", 60),
+        (r"\bcontact", 55),
+    )
+]
+_RELATED_EXCLUDES = re.compile(
+    r"(login|log in|signin|sign in|signup|sign up|register|cart|checkout|career|\bjobs?\b|"
+    r"blog|newsletter|subscribe|press|investor)",
+    re.IGNORECASE,
+)
+_NON_HTML_PATH = re.compile(r"\.(?:pdf|docx?|xlsx?|pptx?|zip|png|jpe?g|gif|svg|webp|mp[34])$", re.IGNORECASE)
+
+
+def _host_key(url: str) -> str:
+    return (urlparse(url).netloc or "").lower().removeprefix("www.")
+
+
+def _url_key(url: str) -> str:
+    parsed = urlparse(url)
+    query = f"?{parsed.query}" if parsed.query else ""
+    return f"{_host_key(url)}{parsed.path.rstrip('/')}{query}"
+
+
+def find_related_links(
+    soup: BeautifulSoup,
+    base_url: str,
+    exclude: Iterable[Optional[str]] = (),
+    limit: int = 6,
+) -> list[str]:
+    """
+    Same-site pages likely to carry DPDP evidence beyond the privacy policy:
+    grievance officer / DPO contact, data-principal rights, children's data, consent.
+
+    Candidates are scored by topic on href and link label (footer links get a
+    small boost) and returned best first. ``exclude`` lists pages already
+    analysed (privacy, terms, cookie); the base page itself is always skipped.
+    """
+    base_host = _host_key(base_url)
+    skip = {_url_key(u) for u in exclude if u}
+    skip.add(_url_key(base_url))
+
+    best: dict[str, tuple[int, int, str]] = {}
+    for position, (anchor, in_footer) in enumerate(_iter_policy_anchors(soup)):
+        absolute = urljoin(base_url, anchor["href"].strip())
+        parsed = urlparse(absolute)
+        if parsed.scheme not in ("http", "https") or _host_key(absolute) != base_host:
+            continue
+        if _NON_HTML_PATH.search(parsed.path):
+            continue
+        key = _url_key(absolute)
+        if key in skip:
+            continue
+
+        href_blob, label_blob = _anchor_match_blob(anchor)
+        score = max(
+            (weight for pattern, weight in _RELATED_PATTERNS
+             if pattern.search(href_blob) or pattern.search(label_blob)),
+            default=0,
+        )
+        if score <= 0:
+            continue
+        if _RELATED_EXCLUDES.search(href_blob) or _RELATED_EXCLUDES.search(label_blob):
+            score -= 40
+        if in_footer:
+            score += 10
+        if score < 50:
+            continue
+        if key not in best or score > best[key][0]:
+            best[key] = (score, position, absolute.split("#", 1)[0])
+
+    ranked = sorted(best.values(), key=lambda item: (-item[0], item[1]))
+    return [url for _, _, url in ranked[:limit]]
 
 
 # ---------------------------------------------------------------------------
@@ -719,35 +806,3 @@ def find_grievance_officer_contact(text: str) -> Optional[str]:
         return phone_match.group(0)
     
     return None
-
-
-def chunk_text(text: str, max_tokens: int = 512, overlap: int = 50) -> List[str]:
-    """
-    Split text into overlapping chunks based on approximate token count.
-    
-    Args:
-        text: Input text to chunk.
-        max_tokens: Maximum tokens per chunk (approximate, using word count * 1.3).
-        overlap: Number of tokens to overlap between chunks.
-    
-    Returns:
-        List[str]: List of text chunks.
-    """
-    words = text.split()
-    # Rough approximation: 1 word ≈ 1.3 tokens
-    max_words = int(max_tokens / 1.3)
-    overlap_words = int(overlap / 1.3)
-    
-    chunks = []
-    i = 0
-    while i < len(words):
-        chunk_words = words[i:i + max_words]
-        chunks.append(' '.join(chunk_words))
-        i += max_words - overlap_words
-        
-        # Prevent infinite loop
-        if i <= 0:
-            i = max_words
-    
-    logger.info(f"Text split into {len(chunks)} chunks.")
-    return chunks

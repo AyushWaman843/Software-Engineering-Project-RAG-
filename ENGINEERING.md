@@ -52,6 +52,27 @@ investigate any `Could not refund` log entry before changing balances.
 
 ## Limits requiring separate validation
 
+Documents longer than `RAG_FULL_TEXT_MAX_CHARS` (default 100,000 characters) are
+analysed from retrieved passages, so the model can only judge what it is shown.
+If a long policy scores lower than expected, check `analysis_details.retrieval`
+in its stored report and compare against a run with a higher
+`RAG_FULL_TEXT_MAX_CHARS`; `python rag_eval.py --inspect policy.txt` shows what
+would be sent. Retrieval and the evidence checks use English vocabulary, so text
+that is not mostly English is always sent whole and is not second-guessed.
+`analysis_details.quality_flags` lists every adjustment the evidence checks made
+(lowered verdicts, filled-in quotes, corrected citations, possible misses to
+review); `RAG_EVIDENCE_CHECKS=0` switches those adjustments off. The tests cover
+retrieval on a synthetic long policy, on the DPDP Rules text and on the gold
+fixtures, and the checklist against the gazette, not the model's answers; run
+`python rag_eval.py --live` for those (at most 2 real API calls unless
+`--max-calls` says otherwise).
+
+Paid-scan refinement now really re-runs the analysis with the extra pages, which
+costs a second LLM call for scans under 80% average confidence. Before, the
+second pass was served from a URL-keyed cache and changed nothing. Set
+`CONFIDENCE_REFINEMENT_ENABLED=0` to avoid the extra call. Its effect on answer
+quality has not been measured against the live model.
+
 Automated tests cover core boundary behavior but do not prove legal accuracy
 of DPDP findings. Have a qualified reviewer check scoring rules and a curated
 set of real policies before treating a score as legal advice. Run a manual
