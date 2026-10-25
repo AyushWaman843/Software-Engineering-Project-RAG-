@@ -18,6 +18,7 @@ from llm_analyzer import (
     detect_injection_phrases,
     get_last_deepseek_error,
     llm_indicators_to_ai_scores,
+    summarize_quality_flags,
 )
 from utils import find_grievance_officer_contact
 
@@ -824,11 +825,16 @@ def run_compliance_check(
             f"Extracted {len(policy_text):,} characters from policy"
         )
         
-        # Chunk text for analysis
-        from utils import chunk_text
-        chunks = chunk_text(policy_text, max_tokens=512, overlap=50)
+        # Sentence-aligned chunks - the same ones the retriever indexes
+        from retrieval import chunk_text_with_offsets, split_documents
+
+        chunks = [
+            chunk
+            for name, doc in split_documents(policy_text, terms_text or "").items()
+            for chunk in chunk_text_with_offsets(doc, name)
+        ]
         report.analysis_details['chunks_analyzed'] = len(chunks)
-        report.analysis_details['sample_chunks'] = [chunks[0][:500] if chunks else ""]
+        report.analysis_details['sample_chunks'] = [chunks[0].text[:500] if chunks else ""]
         report.analysis_details['scan_steps'].append(
             f"Split into {len(chunks)} chunks for analysis"
         )
@@ -880,7 +886,7 @@ def run_compliance_check(
         if llm_result:
             logger.info("Using DeepSeek Expert AI")
             report.analysis_details['scan_steps'].append(
-                "AI Engine: DeepSeek Expert AI (full DPDP Rules context)"
+                "AI Engine: DeepSeek Expert AI (condensed DPDP Rules checklist)"
             )
             report.analysis_details['scan_steps'].append(
                 f"DeepSeek expert analysis ({llm_result.get('model', 'deepseek-chat')}) complete"
@@ -902,11 +908,39 @@ def run_compliance_check(
                 if str(v.get("status", "")).lower() == "partial"
             )
             report.analysis_details['scan_steps'].append(
-                f"Claude indicators: {found_count} Found, {partial_count} Partial"
+                f"DeepSeek indicators: {found_count} Found, {partial_count} Partial"
             )
+            quality_flags = llm_result.get("quality_flags") or []
+            if quality_flags:
+                report.analysis_details['quality_flags'] = quality_flags
+                report.analysis_details['scan_steps'].append(
+                    f"Evidence checks: {summarize_quality_flags(quality_flags)}"
+                )
+            usage = llm_result.get("llm_usage") or {}
+            if usage:
+                report.analysis_details['llm_usage'] = usage
+                if usage.get("cached"):
+                    usage_step = "LLM usage: served from cache (no tokens used)"
+                else:
+                    usage_step = (
+                        f"LLM usage: {usage.get('prompt_tokens') or 0:,} prompt + "
+                        f"{usage.get('completion_tokens') or 0:,} completion tokens in "
+                        f"{(usage.get('latency_ms') or 0) / 1000:.1f}s "
+                        f"({usage.get('attempts', 1)} attempt(s))"
+                    )
+                report.analysis_details['scan_steps'].append(usage_step)
+            retrieval = llm_result.get("retrieval") or {}
+            if retrieval:
+                report.analysis_details['retrieval'] = retrieval
+                report.analysis_details['scan_steps'].append(
+                    f"Retrieval ({retrieval.get('mode')}): sent "
+                    f"{retrieval.get('chars_sent', 0):,} of {retrieval.get('chars_total', 0):,} "
+                    f"characters ({retrieval.get('chunks_sent', 0)} of "
+                    f"{retrieval.get('chunks_indexed', 0)} chunks)"
+                )
             if status_callback:
                 status_callback(
-                    f"Claude Expert: {found_count} Found, {partial_count} Partial"
+                    f"DeepSeek Expert: {found_count} Found, {partial_count} Partial"
                 )
 
         else:
