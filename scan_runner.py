@@ -424,13 +424,20 @@ def run_scan_job(
                 logger.info(f"Refinement triggered for paid scan (avg confidence: {avg_confidence:.0f}%)")
                 
                 # Fetch up to 3 additional pages from the same domain
-                additional_text = fetch_additional_context_pages(url, max_pages=3, driver=driver)
+                additional_text = fetch_additional_context_pages(
+                    url,
+                    max_pages=3,
+                    driver=driver,
+                    exclude_urls=(privacy_url, terms_url, cookie_url),
+                )
                 
                 if additional_text:
                     status(f"Fetched additional context — Re-running AI analysis…", 82)
                     
                     # Combine original and additional text
                     combined_policy_text = f"{policy_text}\n\n{additional_text}"
+                    # Persist what was analysed so excerpts from the extra pages can be located later
+                    policy_text = combined_policy_text
                     
                     # Re-run analysis with combined text
                     def refinement_callback(step: str) -> None:
